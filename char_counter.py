@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import csv
+import io
+import json
 import sys
 from collections import Counter
 from pathlib import Path
@@ -44,6 +47,29 @@ def format_counts(counter: Counter[str]) -> str:
     return "\n".join(lines)
 
 
+def count_rows(counter: Counter[str]) -> list[dict[str, str | int]]:
+    return [
+        {"character": char, "display": display_char(char), "count": count}
+        for char, count in counter.items()
+    ]
+
+
+def format_csv(counter: Counter[str]) -> str:
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=["character", "display", "count"])
+    writer.writeheader()
+    writer.writerows(count_rows(counter))
+    return output.getvalue().rstrip("\r\n")
+
+
+def format_json(counter: Counter[str]) -> str:
+    result = {
+        "type_count": len(counter),
+        "characters": count_rows(counter),
+    }
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
 def read_text_file(path: Path, encoding: str) -> str:
     return path.read_text(encoding=encoding)
 
@@ -62,6 +88,17 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--encoding",
         default="utf-8",
         help="Text encoding used to read the file. Defaults to utf-8.",
+    )
+    output_group = parser.add_mutually_exclusive_group()
+    output_group.add_argument(
+        "--csv",
+        action="store_true",
+        help="Output results as CSV.",
+    )
+    output_group.add_argument(
+        "--json",
+        action="store_true",
+        help="Output results as JSON.",
     )
     return parser.parse_args(argv)
 
@@ -88,7 +125,12 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     counter = count_characters(text, exclude_whitespace=args.exclude_whitespace)
-    print(format_counts(counter))
+    if args.csv:
+        print(format_csv(counter))
+    elif args.json:
+        print(format_json(counter))
+    else:
+        print(format_counts(counter))
     return 0
 
 

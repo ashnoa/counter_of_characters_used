@@ -1,6 +1,7 @@
 import unittest
+import json
 
-from char_counter import count_characters, display_char, format_counts
+from char_counter import count_characters, display_char, format_counts, format_csv, format_json
 
 
 class CountCharactersTest(unittest.TestCase):
@@ -41,6 +42,25 @@ class CountCharactersTest(unittest.TestCase):
         output = format_counts(count_characters("ああ\n"))
 
         self.assertEqual(output, "種類数: 2\n文字\t回数\nあ\t2\n<LF>\t1")
+
+    def test_formats_csv(self):
+        output = format_csv(count_characters("ああ\n"))
+
+        self.assertEqual(output, 'character,display,count\r\nあ,あ,2\r\n"\n",<LF>,1')
+
+    def test_formats_json(self):
+        output = format_json(count_characters("ああ\n"))
+
+        self.assertEqual(
+            json.loads(output),
+            {
+                "type_count": 2,
+                "characters": [
+                    {"character": "あ", "display": "あ", "count": 2},
+                    {"character": "\n", "display": "<LF>", "count": 1},
+                ],
+            },
+        )
 
 
 if __name__ == "__main__":
