@@ -8,6 +8,8 @@ from build_tileset_from_png_font import (
     GlyphPlacement,
     CONTROL_BOTTOM_COLOR,
     CONTROL_TOP_COLOR,
+    K6X8_SPEC,
+    MISAKI_SPEC,
     background_color_for_image,
     destination_position_for_index,
     fill_control_tile,
@@ -33,6 +35,19 @@ class BuildTilesetFromPngFontTest(unittest.TestCase):
     def test_source_box_for_kuten(self):
         self.assertEqual(source_box_for_kuten((1, 1)), (0, 0, 6, 8))
         self.assertEqual(source_box_for_kuten((4, 2)), (6, 24, 12, 32))
+
+    def test_source_box_for_misaki(self):
+        self.assertEqual(
+            source_box_for_kuten((4, 2), font_spec=MISAKI_SPEC),
+            (8, 24, 16, 32),
+        )
+
+    def test_font_specs(self):
+        self.assertEqual(K6X8_SPEC.default_offset_x, 1)
+        self.assertEqual(K6X8_SPEC.default_offset_y, 1)
+        self.assertEqual(MISAKI_SPEC.glyph_width, 8)
+        self.assertEqual(MISAKI_SPEC.default_offset_x, 0)
+        self.assertEqual(MISAKI_SPEC.default_offset_y, 0)
 
     def test_destination_position_for_index(self):
         self.assertEqual(destination_position_for_index(0), (1, 1))

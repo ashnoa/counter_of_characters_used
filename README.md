@@ -198,12 +198,17 @@ python3 encode_text_to_words.py \
 
 ## PNGフォントからタイルセットを作る
 
-`build_tileset_from_png_font.py` は、564x752 pxのPNGフォントからJIS X 0208区点に対応する6x8 pxの文字画像を切り出し、128x192 pxのタイルセットPNGへ配置します。
+`build_tileset_from_png_font.py` は、区点順に並んだPNGフォントからJIS X 0208区点に対応する文字画像を切り出し、128x192 pxのタイルセットPNGへ配置します。
 
-フォントデータは、6×8ドット日本語フォント「k6x8」のPNG形式を前提としています。
+デフォルトでは、6×8ドット日本語フォント「k6x8」のPNG形式を前提としています。
 
 - 配布ページ: https://littlelimit.net/k6x8.htm
 - k6x8 は6×8ドットの日本語ビットマップフォントで、JIS 第一・第二水準をサポートしています。
+
+`--misaki` を指定すると、8×8ドット日本語フォント「美咲フォント」のPNG形式を使います。
+
+- 配布ページ: https://littlelimit.net/misaki.htm
+- 美咲フォントは8×8ドットの日本語ビットマップフォントで、JIS 第一・第二水準をサポートしています。
 
 入力CSVには `character`, `jis_x_0208_kuten`, `bank`, `index` 列が必要です。`kuten_inspector.py` のCSV出力に `bank`, `index` を追加した `char_and_text.csv` をそのまま使えます。
 
@@ -214,13 +219,24 @@ python3 build_tileset_from_png_font.py \
   --output path/to/tileset.png
 ```
 
+美咲フォントPNGを使う場合:
+
+```bash
+python3 build_tileset_from_png_font.py \
+  --misaki \
+  --font-png path/to/misaki.png \
+  --mapping path/to/char_and_text.csv \
+  --output path/to/tileset.png
+```
+
 配置ルール:
 
-- PNGフォントは1文字6x8 px、横方向が点、縦方向が区です。
-- 区点 `04-02` は、横 `(2 - 1) * 6`、縦 `(4 - 1) * 8` の位置から6x8 pxを切り出します。
+- PNGフォントは横方向が点、縦方向が区です。
+- k6x8では1文字6x8 px、美咲フォントでは1文字8x8 pxとして切り出します。
 - タイルセットは16列x24行の8x8タイルです。
 - `index` はタイル番号として扱い、左上から右方向、次に下方向へ進みます。
-- glyphは各8x8タイル内の `(1, 1)` へ貼り付けます。
+- k6x8のglyphは各8x8タイル内の `(1, 1)` へ貼り付けます。
+- 美咲フォントのglyphは各8x8タイル内の `(0, 0)` へ貼り付けます。
 - 背景色は白 `#ffffff` です。
 - `index 255`、つまり0オリジンで15行15列のタイルは常に背景色だけの空白タイルとして扱います。
 - 最後のタイルは制御用として、上半分を `#bfbfbf`、下半分を `#808080` で塗ります。

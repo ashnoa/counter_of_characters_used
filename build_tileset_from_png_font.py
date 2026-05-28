@@ -12,8 +12,6 @@ from pathlib import Path
 from typing import Any
 
 
-FONT_GLYPH_WIDTH = 6
-FONT_GLYPH_HEIGHT = 8
 FONT_COLUMNS = 94
 FONT_ROWS = 94
 TILE_WIDTH = 8
@@ -37,6 +35,31 @@ class GlyphPlacement:
     index: int
 
 
+@dataclass(frozen=True)
+class FontSpec:
+    name: str
+    glyph_width: int
+    glyph_height: int
+    default_offset_x: int
+    default_offset_y: int
+
+
+K6X8_SPEC = FontSpec(
+    name="k6x8",
+    glyph_width=6,
+    glyph_height=8,
+    default_offset_x=1,
+    default_offset_y=1,
+)
+MISAKI_SPEC = FontSpec(
+    name="misaki",
+    glyph_width=8,
+    glyph_height=8,
+    default_offset_x=0,
+    default_offset_y=0,
+)
+
+
 def parse_kuten(value: str) -> tuple[int, int]:
     match = re.fullmatch(r"\s*(\d{1,2})-(\d{1,2})\s*", value)
     if match is None:
@@ -51,11 +74,15 @@ def parse_kuten(value: str) -> tuple[int, int]:
     return ku, ten
 
 
-def source_box_for_kuten(kuten: tuple[int, int]) -> tuple[int, int, int, int]:
+def source_box_for_kuten(
+    kuten: tuple[int, int],
+    *,
+    font_spec: FontSpec = K6X8_SPEC,
+) -> tuple[int, int, int, int]:
     ku, ten = kuten
-    left = (ten - 1) * FONT_GLYPH_WIDTH
-    top = (ku - 1) * FONT_GLYPH_HEIGHT
-    return (left, top, left + FONT_GLYPH_WIDTH, top + FONT_GLYPH_HEIGHT)
+    left = (ten - 1) * font_spec.glyph_width
+    top = (ku - 1) * font_spec.glyph_height
+    return (left, top, left + font_spec.glyph_width, top + font_spec.glyph_height)
 
 
 def destination_position_for_index(
@@ -182,17 +209,26 @@ def build_tileset(
     placements: list[GlyphPlacement],
     output_png: Path,
     *,
-    offset_x: int = 1,
-    offset_y: int = 1,
+    font_spec: FontSpec = K6X8_SPEC,
+    offset_x: int | None = None,
+    offset_y: int | None = None,
 ) -> None:
     Image = load_pillow()
     font_image = Image.open(font_png)
-    expected_size = (FONT_GLYPH_WIDTH * FONT_COLUMNS, FONT_GLYPH_HEIGHT * FONT_ROWS)
+    expected_size = (
+        font_spec.glyph_width * FONT_COLUMNS,
+        font_spec.glyph_height * FONT_ROWS,
+    )
     if font_image.size != expected_size:
         raise ValueError(
-            f"font PNG must be {expected_size[0]}x{expected_size[1]} px: "
+            f"{font_spec.name} font PNG must be {expected_size[0]}x{expected_size[1]} px: "
             f"got {font_image.size[0]}x{font_image.size[1]} px"
         )
+
+    if offset_x is None:
+        offset_x = font_spec.default_offset_x
+    if offset_y is None:
+        offset_y = font_spec.default_offset_y
 
     font_image = font_image.convert("RGB")
     tileset = Image.new(
@@ -203,7 +239,7 @@ def build_tileset(
     for placement in placements:
         if is_reserved_blank_tile(placement.index):
             continue
-        glyph = font_image.crop(source_box_for_kuten(placement.kuten))
+        glyph = font_image.crop(source_box_for_kuten(placement.kuten, font_spec=font_spec))
         tileset.paste(
             glyph,
             destination_position_for_index(
@@ -233,13 +269,13 @@ def warn_if_tileset_is_full(
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build a 128x192 PNG tileset from a 564x752 kuten PNG font.",
+        description="Build a 128x192 PNG tileset from a kuten PNG font.",
     )
     parser.add_argument(
         "--font-png",
         type=Path,
         required=True,
-        help="Source PNG font image. Expected size is 564x752 px.",
+        help="Source PNG font image. k6x8 expects 564x752 px; --misaki expects 752x752 px.",
     )
     parser.add_argument(
         "--mapping",
@@ -263,16 +299,21 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Bank to build. If omitted, all banks are built as separate PNG files.",
     )
     parser.add_argument(
+        "--misaki",
+        action="store_true",
+        help="Use 8x8 Misaki Font PNG layout instead of the default 6x8 k6x8 layout.",
+    )
+    parser.add_argument(
         "--offset-x",
         type=int,
-        default=1,
-        help="Glyph X offset inside each 8x8 tile. Defaults to 1.",
+        default=None,
+        help="Glyph X offset inside each 8x8 tile. Defaults to 1 for k6x8 and 0 for --misaki.",
     )
     parser.add_argument(
         "--offset-y",
         type=int,
-        default=1,
-        help="Glyph Y offset inside each 8x8 tile. Defaults to 1.",
+        default=None,
+        help="Glyph Y offset inside each 8x8 tile. Defaults to 1 for k6x8 and 0 for --misaki.",
     )
     return parser.parse_args(argv)
 
@@ -281,6 +322,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
 
     try:
+        font_spec = MISAKI_SPEC if args.misaki else K6X8_SPEC
         placements = load_placements(args.mapping, bank=args.bank)
         grouped = group_placements_by_bank(placements)
         if not grouped:
@@ -293,6 +335,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.font_png,
                 bank_placements,
                 output_path_for_bank(args.output, bank=bank, multiple_banks=multiple_banks),
+                font_spec=font_spec,
                 offset_x=args.offset_x,
                 offset_y=args.offset_y,
             )
