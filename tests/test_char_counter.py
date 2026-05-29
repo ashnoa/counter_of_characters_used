@@ -1,7 +1,14 @@
 import unittest
 import json
 
-from char_counter import count_characters, display_char, format_counts, format_csv, format_json
+from char_counter import (
+    count_characters,
+    display_char,
+    format_counts,
+    format_csv,
+    format_json,
+    remove_page_break_lines,
+)
 
 
 class CountCharactersTest(unittest.TestCase):
@@ -60,6 +67,18 @@ class CountCharactersTest(unittest.TestCase):
                     {"character": "\n", "display": "<LF>", "count": 1},
                 ],
             },
+        )
+
+    def test_removes_page_break_marker_lines(self):
+        self.assertEqual(
+            remove_page_break_lines("あ\n[改ページ]\nい\n"),
+            "あ\nい\n",
+        )
+
+    def test_does_not_remove_page_break_text_inside_a_line(self):
+        self.assertEqual(
+            remove_page_break_lines("あ[改ページ]\n"),
+            "あ[改ページ]\n",
         )
 
 

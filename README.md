@@ -109,6 +109,7 @@ python3 char_counter.py --json path/to/file.txt
 
 - Pythonの通常のUnicode文字単位で数えます。
 - 文字の並び順は、ファイル内で最初に出現した順です。
+- `[改ページ]` だけが書かれた行はページ区切りとして扱い、使用文字のカウント対象に含めません。
 - Unicode正規化や、絵文字の結合文字列を見た目上の1文字として扱う処理は行いません。
 
 ## JIS X 0208区点とフォント収録状況を調べる
@@ -152,6 +153,7 @@ python3 kuten_inspector.py --text path/to/file.txt --font path/to/font.ttc --fon
 - 区点はフォント固有の値ではなく、JIS X 0208上の位置です。
 - フォントについては、Unicode `cmap` にその文字のコードポイントが含まれるかを確認します。
 - JIS X 0208にない文字の `jis_x_0208_kuten` は空欄になります。
+- JIS X 0208区点を確認できない文字がある場合は、標準エラーへ警告を出して処理を継続します。
 
 ## bank/index CSVを使ってテキストをdw列に変換する
 
@@ -185,14 +187,17 @@ python3 encode_text_to_words.py \
 python3 encode_text_to_words.py \
   --text path/to/diary.txt \
   --mapping path/to/char_and_text.csv \
-  --output path/to/output.asm
+  --output path/to/text.asm
 ```
+
+`--output path/to/text.asm` を指定した場合、ページごとに `path/to/text_0.asm`, `path/to/text_1.asm` のような連番ファイルへ出力します。
 
 変換ルール:
 
 - 各文字は `(bank << 12) | index` の16bit値に変換します。
 - `bank` は上位4bit、`index` は下位12bitとして扱います。
 - テキスト中の改行 `\n` は `$FFFE` に変換します。
+- `[改ページ]` だけが書かれた行はページ区切りとして扱い、その行自体は出力に含めません。
 - テキスト末尾にはEOFとして `$FFFF` を追加します。
 - 出力は `dw $0000, $0001` の形式です。
 

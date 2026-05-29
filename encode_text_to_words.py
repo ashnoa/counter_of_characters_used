@@ -11,6 +11,7 @@ from pathlib import Path
 
 NEWLINE_WORD = 0xFFFE
 EOF_WORD = 0xFFFF
+PAGE_BREAK_LINE = "[改ページ]"
 
 
 def load_mapping(path: Path) -> dict[str, int]:
@@ -68,6 +69,21 @@ def encode_text(text: str, mapping: dict[str, int]) -> list[int]:
     return words
 
 
+def split_pages(text: str) -> list[str]:
+    pages: list[str] = []
+    current_lines: list[str] = []
+
+    for line in text.splitlines(keepends=True):
+        if line.rstrip("\r\n") == PAGE_BREAK_LINE:
+            pages.append("".join(current_lines))
+            current_lines = []
+        else:
+            current_lines.append(line)
+
+    pages.append("".join(current_lines))
+    return pages
+
+
 def format_dw(words: list[int], *, values_per_line: int = 16) -> str:
     if values_per_line <= 0:
         raise ValueError("values_per_line must be greater than zero")
@@ -78,6 +94,10 @@ def format_dw(words: list[int], *, values_per_line: int = 16) -> str:
         values = ", ".join(f"${word:04X}" for word in chunk)
         lines.append(f"dw {values}")
     return "\n".join(lines)
+
+
+def output_path_for_page(output: Path, page_index: int) -> Path:
+    return output.with_name(f"{output.stem}_{page_index}{output.suffix}")
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -111,19 +131,30 @@ def main(argv: list[str] | None = None) -> int:
     try:
         mapping = load_mapping(args.mapping)
         text = args.text.read_text(encoding="utf-8")
-        output = format_dw(encode_text(text, mapping), values_per_line=args.values_per_line)
+        pages = split_pages(text)
+        outputs = [
+            format_dw(encode_text(page, mapping), values_per_line=args.values_per_line)
+            for page in pages
+        ]
     except (OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
     if args.output:
         try:
-            args.output.write_text(output + "\n", encoding="utf-8")
+            for page_index, output in enumerate(outputs):
+                output_path_for_page(args.output, page_index).write_text(
+                    output + "\n",
+                    encoding="utf-8",
+                )
         except OSError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 1
     else:
-        print(output)
+        for page_index, output in enumerate(outputs):
+            if page_index > 0:
+                print()
+            print(output)
     return 0
 
 

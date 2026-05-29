@@ -1,4 +1,5 @@
 import json
+import io
 import unittest
 
 from kuten_inspector import (
@@ -6,6 +7,7 @@ from kuten_inspector import (
     jis_x_0208_kuten,
     load_counter_from_char_counter_json,
     rows_from_counter,
+    warn_missing_kuten,
 )
 
 
@@ -66,6 +68,24 @@ class KutenInspectorTest(unittest.TestCase):
             )
 
             self.assertEqual(load_counter_from_char_counter_json(path), {"あ": 2})
+
+    def test_warns_missing_kuten(self):
+        stream = io.StringIO()
+        rows = rows_from_counter({"あ": 1, "😀": 1}, set())
+
+        warn_missing_kuten(rows, stream=stream)
+
+        warning = stream.getvalue()
+        self.assertIn("warning: 1 character(s) have no JIS X 0208 kuten code", warning)
+        self.assertIn("😀 (U+1F600)", warning)
+
+    def test_does_not_warn_when_all_rows_have_kuten(self):
+        stream = io.StringIO()
+        rows = rows_from_counter({"あ": 1}, set())
+
+        warn_missing_kuten(rows, stream=stream)
+
+        self.assertEqual(stream.getvalue(), "")
 
 
 if __name__ == "__main__":

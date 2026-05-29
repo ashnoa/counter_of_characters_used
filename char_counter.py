@@ -18,6 +18,16 @@ VISIBLE_LABELS = {
     "\r": "<CR>",
     "\t": "<TAB>",
 }
+PAGE_BREAK_LINE = "[改ページ]"
+
+
+def remove_page_break_lines(text: str) -> str:
+    """Remove lines that only contain the page break marker."""
+    return "".join(
+        line
+        for line in text.splitlines(keepends=True)
+        if line.rstrip("\r\n") != PAGE_BREAK_LINE
+    )
 
 
 def count_characters(text: str, *, exclude_whitespace: bool = False) -> Counter[str]:
@@ -124,7 +134,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: could not read {args.file}: {exc}", file=sys.stderr)
         return 1
 
-    counter = count_characters(text, exclude_whitespace=args.exclude_whitespace)
+    counter = count_characters(
+        remove_page_break_lines(text),
+        exclude_whitespace=args.exclude_whitespace,
+    )
     if args.csv:
         print(format_csv(counter))
     elif args.json:

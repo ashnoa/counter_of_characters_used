@@ -3,7 +3,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from encode_text_to_words import EOF_WORD, NEWLINE_WORD, encode_text, format_dw, load_mapping
+from encode_text_to_words import (
+    EOF_WORD,
+    NEWLINE_WORD,
+    encode_text,
+    format_dw,
+    load_mapping,
+    output_path_for_page,
+    split_pages,
+)
 
 
 class EncodeTextToWordsTest(unittest.TestCase):
@@ -25,6 +33,16 @@ class EncodeTextToWordsTest(unittest.TestCase):
         output = format_dw([0x0000, 0x100A, NEWLINE_WORD, EOF_WORD], values_per_line=2)
 
         self.assertEqual(output, "dw $0000, $100A\ndw $FFFE, $FFFF")
+
+    def test_split_pages_on_page_break_marker_line(self):
+        self.assertEqual(split_pages("あ\n[改ページ]\nい\n"), ["あ\n", "い\n"])
+
+    def test_split_pages_keeps_page_break_text_inside_a_line(self):
+        self.assertEqual(split_pages("あ[改ページ]\n"), ["あ[改ページ]\n"])
+
+    def test_output_path_for_page_adds_page_index(self):
+        self.assertEqual(output_path_for_page(Path("text.asm"), 0), Path("text_0.asm"))
+        self.assertEqual(output_path_for_page(Path("text.asm"), 1), Path("text_1.asm"))
 
     def test_load_mapping_from_csv(self):
         with tempfile.TemporaryDirectory() as directory:

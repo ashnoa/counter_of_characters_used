@@ -139,6 +139,26 @@ def format_json(rows: list[dict[str, str | int | bool]]) -> str:
     return json.dumps({"characters": rows}, ensure_ascii=False, indent=2)
 
 
+def warn_missing_kuten(
+    rows: list[dict[str, str | int | bool]],
+    *,
+    stream: Any = sys.stderr,
+) -> None:
+    missing_rows = [row for row in rows if not row["in_jis_x_0208"]]
+    if not missing_rows:
+        return
+
+    print(
+        f"warning: {len(missing_rows)} character(s) have no JIS X 0208 kuten code:",
+        file=stream,
+    )
+    for row in missing_rows:
+        print(
+            f"  {row['display']} ({row['codepoint']})",
+            file=stream,
+        )
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Inspect JIS X 0208 kuten codes and font coverage.",
@@ -194,6 +214,8 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+
+    warn_missing_kuten(rows)
 
     if args.json:
         print(format_json(rows))
