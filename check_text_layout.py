@@ -12,7 +12,6 @@ from pathlib import Path
 PAGE_BREAK_LINE = "[改ページ]"
 MAX_LINE_LENGTH = 18
 MAX_LINES_PER_PAGE = 16
-TRAILING_ALLOWED_CHARS = "、。"
 
 
 @dataclass(frozen=True)
@@ -22,13 +21,6 @@ class LayoutIssue:
 
 def is_page_break_line(line: str) -> bool:
     return line.rstrip("\r\n") == PAGE_BREAK_LINE
-
-
-def effective_line_length(line: str) -> int:
-    content = line.rstrip("\r\n")
-    if len(content) <= MAX_LINE_LENGTH:
-        return len(content)
-    return len(content.rstrip(TRAILING_ALLOWED_CHARS))
 
 
 def split_pages_with_line_numbers(text: str) -> list[list[tuple[int, str]]]:
@@ -61,12 +53,10 @@ def check_text_layout(text: str) -> list[LayoutIssue]:
 
         for line_number, line in page:
             content = line.rstrip("\r\n")
-            effective_length = effective_line_length(line)
-            if effective_length > MAX_LINE_LENGTH:
+            if len(content) > MAX_LINE_LENGTH:
                 issues.append(
                     LayoutIssue(
-                        f"line {line_number}: has {len(content)} characters "
-                        f"({effective_length} excluding allowed trailing punctuation); "
+                        f"line {line_number}: has {len(content)} characters; "
                         f"maximum is {MAX_LINE_LENGTH}: {content}"
                     )
                 )

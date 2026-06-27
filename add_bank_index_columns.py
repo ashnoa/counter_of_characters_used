@@ -12,11 +12,8 @@ from pathlib import Path
 DEFAULT_MODE = "8000"
 DEFAULT_CHECK = "1"
 FIRST_BANK = 1
-MAX_INDEX = 382
-RESERVED_INDEXES = {255}
-AVAILABLE_INDEXES = [
-    index for index in range(MAX_INDEX + 1) if index not in RESERVED_INDEXES
-]
+MAX_TEXT_INDEX = 253
+AVAILABLE_INDEXES = list(range(MAX_TEXT_INDEX + 1))
 ROWS_PER_BANK = len(AVAILABLE_INDEXES)
 ADDED_COLUMNS = ["mode", "bank", "index", "check"]
 

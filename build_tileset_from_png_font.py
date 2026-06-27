@@ -24,6 +24,8 @@ TILESET_HEIGHT = TILE_HEIGHT * TILESET_ROWS
 BACKGROUND_COLOR = (255, 255, 255)
 CONTROL_TOP_COLOR = (191, 191, 191)
 CONTROL_BOTTOM_COLOR = (128, 128, 128)
+FIXED_SYMBOL_TILE_INDEX = 254
+FIXED_SYMBOL_KUTEN = (2, 7)
 RESERVED_BLANK_TILE_INDEXES = {255}
 
 
@@ -204,6 +206,46 @@ def fill_control_tile(tileset: Any) -> None:
     )
 
 
+def paste_glyph(
+    tileset: Any,
+    font_image: Any,
+    kuten: tuple[int, int],
+    index: int,
+    *,
+    font_spec: FontSpec,
+    offset_x: int,
+    offset_y: int,
+) -> None:
+    glyph = font_image.crop(source_box_for_kuten(kuten, font_spec=font_spec))
+    tileset.paste(
+        glyph,
+        destination_position_for_index(
+            index,
+            offset_x=offset_x,
+            offset_y=offset_y,
+        ),
+    )
+
+
+def fill_fixed_symbol_tile(
+    tileset: Any,
+    font_image: Any,
+    *,
+    font_spec: FontSpec,
+    offset_x: int,
+    offset_y: int,
+) -> None:
+    paste_glyph(
+        tileset,
+        font_image,
+        FIXED_SYMBOL_KUTEN,
+        FIXED_SYMBOL_TILE_INDEX,
+        font_spec=font_spec,
+        offset_x=offset_x,
+        offset_y=offset_y,
+    )
+
+
 def build_tileset(
     font_png: Path,
     placements: list[GlyphPlacement],
@@ -239,16 +281,23 @@ def build_tileset(
     for placement in placements:
         if is_reserved_blank_tile(placement.index):
             continue
-        glyph = font_image.crop(source_box_for_kuten(placement.kuten, font_spec=font_spec))
-        tileset.paste(
-            glyph,
-            destination_position_for_index(
-                placement.index,
-                offset_x=offset_x,
-                offset_y=offset_y,
-            ),
+        paste_glyph(
+            tileset,
+            font_image,
+            placement.kuten,
+            placement.index,
+            font_spec=font_spec,
+            offset_x=offset_x,
+            offset_y=offset_y,
         )
 
+    fill_fixed_symbol_tile(
+        tileset,
+        font_image,
+        font_spec=font_spec,
+        offset_x=offset_x,
+        offset_y=offset_y,
+    )
     fill_control_tile(tileset)
     tileset.save(output_png)
 

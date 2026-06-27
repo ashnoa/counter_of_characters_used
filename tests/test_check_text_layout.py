@@ -2,7 +2,6 @@ import unittest
 
 from check_text_layout import (
     check_text_layout,
-    effective_line_length,
     split_pages_with_line_numbers,
 )
 
@@ -17,18 +16,14 @@ class CheckTextLayoutTest(unittest.TestCase):
         self.assertEqual(len(issues), 1)
         self.assertIn("line 1", issues[0].message)
 
-    def test_accepts_line_over_limit_only_because_of_trailing_punctuation(self):
-        self.assertEqual(check_text_layout(("あ" * 18) + "。"), [])
-        self.assertEqual(check_text_layout(("あ" * 18) + "、。"), [])
+    def test_rejects_line_over_limit_even_with_trailing_punctuation(self):
+        self.assertEqual(len(check_text_layout(("あ" * 18) + "。")), 1)
+        self.assertEqual(len(check_text_layout(("あ" * 18) + "、")), 1)
 
     def test_rejects_line_over_limit_before_trailing_punctuation(self):
         issues = check_text_layout(("あ" * 19) + "。")
 
         self.assertEqual(len(issues), 1)
-
-    def test_effective_line_length_ignores_allowed_trailing_punctuation_only(self):
-        self.assertEqual(effective_line_length(("あ" * 18) + "。"), 18)
-        self.assertEqual(effective_line_length(("あ" * 17) + "。あ"), 19)
 
     def test_page_break_lines_are_not_counted_as_page_lines(self):
         text = "\n".join(["あ"] * 16) + "\n[改ページ]\n" + "\n".join(["い"] * 16)

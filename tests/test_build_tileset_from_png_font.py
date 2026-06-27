@@ -8,11 +8,14 @@ from build_tileset_from_png_font import (
     GlyphPlacement,
     CONTROL_BOTTOM_COLOR,
     CONTROL_TOP_COLOR,
+    FIXED_SYMBOL_KUTEN,
+    FIXED_SYMBOL_TILE_INDEX,
     K6X8_SPEC,
     MISAKI_SPEC,
     background_color_for_image,
     destination_position_for_index,
     fill_control_tile,
+    fill_fixed_symbol_tile,
     group_placements_by_bank,
     is_reserved_blank_tile,
     load_placements,
@@ -58,9 +61,15 @@ class BuildTilesetFromPngFontTest(unittest.TestCase):
         self.assertEqual(tile_origin_for_index(383), (120, 184))
 
     def test_index_255_is_reserved_blank_tile(self):
-        self.assertTrue(is_reserved_blank_tile(255))
         self.assertFalse(is_reserved_blank_tile(254))
+        self.assertTrue(is_reserved_blank_tile(255))
+        self.assertFalse(is_reserved_blank_tile(253))
         self.assertFalse(is_reserved_blank_tile(256))
+
+    def test_fixed_symbol_tile_constants(self):
+        self.assertEqual(FIXED_SYMBOL_TILE_INDEX, 254)
+        self.assertEqual(FIXED_SYMBOL_KUTEN, (2, 7))
+        self.assertEqual(source_box_for_kuten(FIXED_SYMBOL_KUTEN), (36, 8, 42, 16))
 
     def test_load_placements_filters_bank(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -175,6 +184,33 @@ class BuildTilesetFromPngFontTest(unittest.TestCase):
                 (CONTROL_BOTTOM_COLOR, (120, 188, 128, 192)),
             ],
         )
+
+    def test_fill_fixed_symbol_tile_pastes_to_index_254(self):
+        class ImageStub:
+            def crop(self, box):
+                self.cropped_box = box
+                return "glyph"
+
+        class TilesetStub:
+            def __init__(self):
+                self.calls = []
+
+            def paste(self, glyph, position):
+                self.calls.append((glyph, position))
+
+        font_image = ImageStub()
+        tileset = TilesetStub()
+
+        fill_fixed_symbol_tile(
+            tileset,
+            font_image,
+            font_spec=K6X8_SPEC,
+            offset_x=1,
+            offset_y=1,
+        )
+
+        self.assertEqual(font_image.cropped_box, (36, 8, 42, 16))
+        self.assertEqual(tileset.calls, [("glyph", (113, 121))])
 
     def test_warns_when_tileset_is_full(self):
         stream = io.StringIO()

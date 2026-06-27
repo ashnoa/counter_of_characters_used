@@ -14,13 +14,11 @@ from add_bank_index_columns import (
 
 
 class AddBankIndexColumnsTest(unittest.TestCase):
-    def test_bank_index_for_row_uses_383_rows_per_bank(self):
+    def test_bank_index_for_row_uses_254_rows_per_bank(self):
         self.assertEqual(bank_index_for_row(0), (1, 0))
-        self.assertEqual(bank_index_for_row(254), (1, 254))
-        self.assertEqual(bank_index_for_row(255), (1, 256))
-        self.assertEqual(bank_index_for_row(381), (1, 382))
-        self.assertEqual(bank_index_for_row(382), (2, 0))
-        self.assertEqual(bank_index_for_row(383), (2, 1))
+        self.assertEqual(bank_index_for_row(253), (1, 253))
+        self.assertEqual(bank_index_for_row(254), (2, 0))
+        self.assertEqual(bank_index_for_row(255), (2, 1))
 
     def test_adds_columns_after_existing_columns(self):
         fieldnames = ["character", "count"]
