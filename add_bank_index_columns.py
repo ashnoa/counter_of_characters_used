@@ -12,7 +12,7 @@ from pathlib import Path
 DEFAULT_MODE = "8000"
 DEFAULT_CHECK = "1"
 FIRST_BANK = 1
-MAX_TEXT_INDEX = 253
+MAX_TEXT_INDEX = 252
 AVAILABLE_INDEXES = list(range(MAX_TEXT_INDEX + 1))
 ROWS_PER_BANK = len(AVAILABLE_INDEXES)
 ADDED_COLUMNS = ["mode", "bank", "index", "check"]

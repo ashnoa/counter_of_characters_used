@@ -60,14 +60,14 @@ class BuildTilesetFromPngFontTest(unittest.TestCase):
     def test_tile_origin_for_last_tile(self):
         self.assertEqual(tile_origin_for_index(383), (120, 184))
 
-    def test_index_255_is_reserved_blank_tile(self):
-        self.assertFalse(is_reserved_blank_tile(254))
-        self.assertTrue(is_reserved_blank_tile(255))
+    def test_indexes_254_and_255_are_reserved_blank_tiles(self):
         self.assertFalse(is_reserved_blank_tile(253))
+        self.assertTrue(is_reserved_blank_tile(254))
+        self.assertTrue(is_reserved_blank_tile(255))
         self.assertFalse(is_reserved_blank_tile(256))
 
     def test_fixed_symbol_tile_constants(self):
-        self.assertEqual(FIXED_SYMBOL_TILE_INDEX, 254)
+        self.assertEqual(FIXED_SYMBOL_TILE_INDEX, 253)
         self.assertEqual(FIXED_SYMBOL_KUTEN, (2, 7))
         self.assertEqual(source_box_for_kuten(FIXED_SYMBOL_KUTEN), (36, 8, 42, 16))
 
@@ -185,7 +185,7 @@ class BuildTilesetFromPngFontTest(unittest.TestCase):
             ],
         )
 
-    def test_fill_fixed_symbol_tile_pastes_to_index_254(self):
+    def test_fill_fixed_symbol_tile_pastes_to_index_253(self):
         class ImageStub:
             def crop(self, box):
                 self.cropped_box = box
@@ -210,7 +210,7 @@ class BuildTilesetFromPngFontTest(unittest.TestCase):
         )
 
         self.assertEqual(font_image.cropped_box, (36, 8, 42, 16))
-        self.assertEqual(tileset.calls, [("glyph", (113, 121))])
+        self.assertEqual(tileset.calls, [("glyph", (105, 121))])
 
     def test_warns_when_tileset_is_full(self):
         stream = io.StringIO()
