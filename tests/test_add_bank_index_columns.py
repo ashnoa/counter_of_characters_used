@@ -20,6 +20,17 @@ class AddBankIndexColumnsTest(unittest.TestCase):
         self.assertEqual(bank_index_for_row(253), (2, 0))
         self.assertEqual(bank_index_for_row(254), (2, 1))
 
+    def test_start_index_is_applied_to_every_bank(self):
+        self.assertEqual(bank_index_for_row(0, start_index=128), (1, 128))
+        self.assertEqual(bank_index_for_row(252, start_index=128), (1, 380))
+        self.assertEqual(bank_index_for_row(253, start_index=128), (2, 128))
+        self.assertEqual(bank_index_for_row(254, start_index=128), (2, 129))
+
+    def test_rejects_start_index_outside_supported_range(self):
+        for start_index in (-1, 129):
+            with self.subTest(start_index=start_index), self.assertRaises(ValueError):
+                bank_index_for_row(0, start_index=start_index)
+
     def test_adds_columns_after_existing_columns(self):
         fieldnames = ["character", "count"]
         rows = [{"character": "あ", "count": "2"}, {"character": "い", "count": "1"}]
@@ -64,6 +75,22 @@ class AddBankIndexColumnsTest(unittest.TestCase):
 
         self.assertEqual([row["character"] for row in output_rows], ["あ", "い"])
         self.assertEqual([row["index"] for row in output_rows], ["0", "1"])
+
+    def test_adds_columns_from_configured_start_index(self):
+        fieldnames = ["character", "display"]
+        rows = [
+            {"character": "あ", "display": "あ"},
+            {"character": "\n", "display": "<LF>"},
+            {"character": "い", "display": "い"},
+        ]
+
+        _, output_rows = add_bank_index_columns(
+            rows,
+            fieldnames,
+            start_index=128,
+        )
+
+        self.assertEqual([row["index"] for row in output_rows], ["128", "129"])
 
     def test_detects_newline_rows(self):
         self.assertTrue(is_newline_row({"character": "\n", "display": "<LF>"}))

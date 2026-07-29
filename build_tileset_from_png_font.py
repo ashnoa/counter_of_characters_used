@@ -24,9 +24,12 @@ TILESET_HEIGHT = TILE_HEIGHT * TILESET_ROWS
 BACKGROUND_COLOR = (255, 255, 255)
 CONTROL_TOP_COLOR = (191, 191, 191)
 CONTROL_BOTTOM_COLOR = (128, 128, 128)
-FIXED_SYMBOL_TILE_INDEX = 253
+FIXED_SYMBOL_RELATIVE_INDEX = 253
+FIXED_SYMBOL_TILE_INDEX = FIXED_SYMBOL_RELATIVE_INDEX
 FIXED_SYMBOL_KUTEN = (2, 7)
-RESERVED_BLANK_TILE_INDEXES = {254, 255}
+RESERVED_BLANK_RELATIVE_INDEXES = {254, 255}
+RESERVED_BLANK_TILE_INDEXES = RESERVED_BLANK_RELATIVE_INDEXES
+MAX_START_INDEX = 128
 
 
 @dataclass(frozen=True)
@@ -101,8 +104,28 @@ def destination_position_for_index(
     return tile_x + offset_x, tile_y + offset_y
 
 
-def is_reserved_blank_tile(index: int) -> bool:
-    return index in RESERVED_BLANK_TILE_INDEXES
+def validate_start_index(start_index: int) -> None:
+    if not 0 <= start_index <= MAX_START_INDEX:
+        raise ValueError(
+            f"start_index must be between 0 and {MAX_START_INDEX}: {start_index}"
+        )
+
+
+def fixed_symbol_tile_index(start_index: int = 0) -> int:
+    validate_start_index(start_index)
+    return start_index + FIXED_SYMBOL_RELATIVE_INDEX
+
+
+def reserved_blank_tile_indexes(start_index: int = 0) -> set[int]:
+    validate_start_index(start_index)
+    return {
+        start_index + relative_index
+        for relative_index in RESERVED_BLANK_RELATIVE_INDEXES
+    }
+
+
+def is_reserved_blank_tile(index: int, *, start_index: int = 0) -> bool:
+    return index in reserved_blank_tile_indexes(start_index)
 
 
 def tile_origin_for_index(index: int) -> tuple[int, int]:
@@ -234,12 +257,13 @@ def fill_fixed_symbol_tile(
     font_spec: FontSpec,
     offset_x: int,
     offset_y: int,
+    start_index: int = 0,
 ) -> None:
     paste_glyph(
         tileset,
         font_image,
         FIXED_SYMBOL_KUTEN,
-        FIXED_SYMBOL_TILE_INDEX,
+        fixed_symbol_tile_index(start_index),
         font_spec=font_spec,
         offset_x=offset_x,
         offset_y=offset_y,
@@ -254,7 +278,9 @@ def build_tileset(
     font_spec: FontSpec = K6X8_SPEC,
     offset_x: int | None = None,
     offset_y: int | None = None,
+    start_index: int = 0,
 ) -> None:
+    validate_start_index(start_index)
     Image = load_pillow()
     font_image = Image.open(font_png)
     expected_size = (
@@ -279,7 +305,7 @@ def build_tileset(
         BACKGROUND_COLOR,
     )
     for placement in placements:
-        if is_reserved_blank_tile(placement.index):
+        if is_reserved_blank_tile(placement.index, start_index=start_index):
             continue
         paste_glyph(
             tileset,
@@ -297,6 +323,7 @@ def build_tileset(
         font_spec=font_spec,
         offset_x=offset_x,
         offset_y=offset_y,
+        start_index=start_index,
     )
     fill_control_tile(tileset)
     tileset.save(output_png)
@@ -364,6 +391,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=None,
         help="Glyph Y offset inside each 8x8 tile. Defaults to 1 for k6x8 and 0 for --misaki.",
     )
+    parser.add_argument(
+        "--start-index",
+        type=int,
+        default=0,
+        help=(
+            "First text tile index. Moves the fixed symbol by the same amount; "
+            "the control tile remains at index 383. Must be between 0 and 128. "
+            "Defaults to 0."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -387,6 +424,7 @@ def main(argv: list[str] | None = None) -> int:
                 font_spec=font_spec,
                 offset_x=args.offset_x,
                 offset_y=args.offset_y,
+                start_index=args.start_index,
             )
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)

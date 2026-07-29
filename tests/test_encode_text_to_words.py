@@ -25,6 +25,14 @@ class EncodeTextToWordsTest(unittest.TestCase):
 
         self.assertEqual(encode_text("あ\n", mapping), [0x000A, NEWLINE_WORD, EOF_WORD])
 
+    def test_encode_text_supports_misaki_extension_characters_from_mapping(self):
+        mapping = {"Ⅰ": 0x1000, "Ⅱ": 0x1001, "Ⅲ": 0x1002}
+
+        self.assertEqual(
+            encode_text("ⅠⅡⅢ", mapping),
+            [0x1000, 0x1001, 0x1002, EOF_WORD],
+        )
+
     def test_encode_text_rejects_unmapped_character(self):
         with self.assertRaisesRegex(ValueError, "no mapping"):
             encode_text("未", {})

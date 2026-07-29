@@ -13,14 +13,18 @@ from build_tileset_from_png_font import (
     K6X8_SPEC,
     MISAKI_SPEC,
     background_color_for_image,
+    build_tileset,
     destination_position_for_index,
     fill_control_tile,
     fill_fixed_symbol_tile,
+    fixed_symbol_tile_index,
     group_placements_by_bank,
     is_reserved_blank_tile,
+    load_pillow,
     load_placements,
     output_path_for_bank,
     parse_kuten,
+    reserved_blank_tile_indexes,
     source_box_for_kuten,
     tile_origin_for_index,
     warn_if_tileset_is_full,
@@ -45,6 +49,19 @@ class BuildTilesetFromPngFontTest(unittest.TestCase):
             (8, 24, 16, 32),
         )
 
+    def test_source_boxes_for_misaki_row_13_extensions(self):
+        self.assertEqual(
+            [
+                source_box_for_kuten((13, ten), font_spec=MISAKI_SPEC)
+                for ten in (21, 22, 23)
+            ],
+            [
+                (160, 96, 168, 104),
+                (168, 96, 176, 104),
+                (176, 96, 184, 104),
+            ],
+        )
+
     def test_font_specs(self):
         self.assertEqual(K6X8_SPEC.default_offset_x, 1)
         self.assertEqual(K6X8_SPEC.default_offset_y, 1)
@@ -66,10 +83,23 @@ class BuildTilesetFromPngFontTest(unittest.TestCase):
         self.assertTrue(is_reserved_blank_tile(255))
         self.assertFalse(is_reserved_blank_tile(256))
 
+    def test_reserved_tiles_move_with_start_index(self):
+        self.assertEqual(reserved_blank_tile_indexes(128), {382, 383})
+        self.assertFalse(is_reserved_blank_tile(254, start_index=128))
+        self.assertFalse(is_reserved_blank_tile(255, start_index=128))
+        self.assertTrue(is_reserved_blank_tile(382, start_index=128))
+        self.assertTrue(is_reserved_blank_tile(383, start_index=128))
+
+    def test_rejects_start_index_outside_supported_range(self):
+        for start_index in (-1, 129):
+            with self.subTest(start_index=start_index), self.assertRaises(ValueError):
+                fixed_symbol_tile_index(start_index)
+
     def test_fixed_symbol_tile_constants(self):
         self.assertEqual(FIXED_SYMBOL_TILE_INDEX, 253)
         self.assertEqual(FIXED_SYMBOL_KUTEN, (2, 7))
         self.assertEqual(source_box_for_kuten(FIXED_SYMBOL_KUTEN), (36, 8, 42, 16))
+        self.assertEqual(fixed_symbol_tile_index(128), 381)
 
     def test_load_placements_filters_bank(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -211,6 +241,57 @@ class BuildTilesetFromPngFontTest(unittest.TestCase):
 
         self.assertEqual(font_image.cropped_box, (36, 8, 42, 16))
         self.assertEqual(tileset.calls, [("glyph", (105, 121))])
+
+    def test_fill_fixed_symbol_tile_moves_relative_to_start_index(self):
+        class ImageStub:
+            def crop(self, box):
+                return "glyph"
+
+        class TilesetStub:
+            def __init__(self):
+                self.calls = []
+
+            def paste(self, glyph, position):
+                self.calls.append((glyph, position))
+
+        tileset = TilesetStub()
+        fill_fixed_symbol_tile(
+            tileset,
+            ImageStub(),
+            font_spec=MISAKI_SPEC,
+            offset_x=0,
+            offset_y=0,
+            start_index=128,
+        )
+
+        self.assertEqual(tileset.calls, [("glyph", (104, 184))])
+
+    def test_build_with_start_128_keeps_text_at_absolute_indexes_254_and_255(self):
+        Image = load_pillow()
+        with tempfile.TemporaryDirectory() as directory:
+            font_path = Path(directory) / "font.png"
+            output_path = Path(directory) / "tileset.png"
+            Image.new("RGB", (752, 752), (255, 0, 0)).save(font_path)
+            placements = [
+                GlyphPlacement(character="あ", kuten=(4, 2), bank=1, index=254),
+                GlyphPlacement(character="い", kuten=(4, 4), bank=1, index=255),
+            ]
+
+            build_tileset(
+                font_path,
+                placements,
+                output_path,
+                font_spec=MISAKI_SPEC,
+                start_index=128,
+            )
+
+            with Image.open(output_path) as tileset:
+                self.assertEqual(tileset.getpixel((112, 120)), (255, 0, 0))
+                self.assertEqual(tileset.getpixel((120, 120)), (255, 0, 0))
+                self.assertEqual(tileset.getpixel((104, 184)), (255, 0, 0))
+                self.assertEqual(tileset.getpixel((112, 184)), (255, 255, 255))
+                self.assertEqual(tileset.getpixel((120, 184)), CONTROL_TOP_COLOR)
+                self.assertEqual(tileset.getpixel((120, 188)), CONTROL_BOTTOM_COLOR)
 
     def test_warns_when_tileset_is_full(self):
         stream = io.StringIO()

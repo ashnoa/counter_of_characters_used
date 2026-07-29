@@ -14,6 +14,13 @@ from typing import Any
 from char_counter import count_characters, display_char, read_text_file
 
 
+MISAKI_KUTEN_EXTENSIONS = {
+    "Ⅰ": (13, 21),
+    "Ⅱ": (13, 22),
+    "Ⅲ": (13, 23),
+}
+
+
 def jis_x_0208_kuten(char: str) -> tuple[int, int] | None:
     """Return the JIS X 0208 kuten code for a character, if available."""
     try:
@@ -35,6 +42,20 @@ def jis_x_0208_kuten(char: str) -> tuple[int, int] | None:
         return None
 
     return first - 0x20, second - 0x20
+
+
+def kuten_for_character(
+    char: str,
+    *,
+    misaki: bool = False,
+) -> tuple[int, int] | None:
+    """Return a usable kuten code, optionally including Misaki extensions."""
+    kuten = jis_x_0208_kuten(char)
+    if kuten is not None:
+        return kuten
+    if misaki:
+        return MISAKI_KUTEN_EXTENSIONS.get(char)
+    return None
 
 
 def format_kuten(kuten: tuple[int, int] | None) -> str:
@@ -78,10 +99,15 @@ def load_font_codepoints(font_path: Path, font_number: int | None = None) -> set
 def rows_from_counter(
     counter: dict[str, int],
     font_codepoints: set[int],
+    *,
+    misaki: bool = False,
 ) -> list[dict[str, str | int | bool]]:
     rows: list[dict[str, str | int | bool]] = []
     for char, count in counter.items():
-        kuten = jis_x_0208_kuten(char)
+        jis_kuten = jis_x_0208_kuten(char)
+        kuten = jis_kuten
+        if kuten is None and misaki:
+            kuten = MISAKI_KUTEN_EXTENSIONS.get(char)
         rows.append(
             {
                 "character": char,
@@ -89,7 +115,7 @@ def rows_from_counter(
                 "codepoint": f"U+{ord(char):04X}",
                 "count": count,
                 "jis_x_0208_kuten": format_kuten(kuten),
-                "in_jis_x_0208": kuten is not None,
+                "in_jis_x_0208": jis_kuten is not None,
                 "in_font": ord(char) in font_codepoints,
             }
         )
@@ -144,7 +170,7 @@ def warn_missing_kuten(
     *,
     stream: Any = sys.stderr,
 ) -> None:
-    missing_rows = [row for row in rows if not row["in_jis_x_0208"]]
+    missing_rows = [row for row in rows if not row["jis_x_0208_kuten"]]
     if not missing_rows:
         return
 
@@ -187,6 +213,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Font index to use for TTC collections. Defaults to 0 for .ttc files.",
     )
     parser.add_argument(
+        "--misaki",
+        action="store_true",
+        help="Include Misaki Font kuten extensions in row 13.",
+    )
+    parser.add_argument(
         "--encoding",
         default="utf-8",
         help="Text encoding for --text input. Defaults to utf-8.",
@@ -210,7 +241,7 @@ def main(argv: list[str] | None = None) -> int:
             counter = load_counter_from_char_counter_json(args.char_counter_json)
 
         font_codepoints = load_font_codepoints(args.font, args.font_number)
-        rows = rows_from_counter(counter, font_codepoints)
+        rows = rows_from_counter(counter, font_codepoints, misaki=args.misaki)
     except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

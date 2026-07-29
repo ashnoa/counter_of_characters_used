@@ -142,6 +142,19 @@ JSONで出力する:
 python3 kuten_inspector.py --text path/to/file.txt --font path/to/font.ttf --json
 ```
 
+美咲フォントを使う場合は `--misaki` を指定します。
+
+```bash
+python3 kuten_inspector.py \
+  --text path/to/file.txt \
+  --font path/to/misaki_gothic.ttf \
+  --misaki
+```
+
+`--misaki` を指定すると、美咲フォント独自の13区拡張として `Ⅰ` を
+`13-21`、`Ⅱ` を `13-22`、`Ⅲ` を `13-23` に割り当てます。これらは標準の
+JIS X 0208には含まれないため、出力の `in_jis_x_0208` は `False` のままです。
+
 TTCフォントコレクションの2番目以降のフォントを調べる場合は `--font-number` を指定します。
 
 ```bash
@@ -153,6 +166,7 @@ python3 kuten_inspector.py --text path/to/file.txt --font path/to/font.ttc --fon
 - 区点はフォント固有の値ではなく、JIS X 0208上の位置です。
 - フォントについては、Unicode `cmap` にその文字のコードポイントが含まれるかを確認します。
 - JIS X 0208にない文字の `jis_x_0208_kuten` は空欄になります。
+- `--misaki` で対応する独自拡張文字は、標準JIS外でも美咲フォント上の区点を出力します。
 - JIS X 0208区点を確認できない文字がある場合は、標準エラーへ警告を出して処理を継続します。
 
 ## テキストの表示制約をチェックする
@@ -184,11 +198,21 @@ python3 add_bank_index_columns.py \
   --output path/to/char_and_text.csv
 ```
 
+各bankの文字をindex 128から割り当てる場合は `--start-index 128` を指定します。
+タイルセットは16列のため、index 128はタイル座標 `(0, 8)` です。
+
+```bash
+python3 add_bank_index_columns.py \
+  --input path/to/kuten.csv \
+  --output path/to/char_and_text.csv \
+  --start-index 128
+```
+
 追加される列:
 
 - `mode`: 全行 `8000`
-- `bank`: `1` 始まり。`index 0..252` を使い切ったら1増えます。
-- `index`: `0` 始まり。最大 `252` まで使います。
+- `bank`: `1` 始まり。各bankで253文字を割り当てたら1増えます。
+- `index`: デフォルトは `0..252` を使います。`--start-index` 指定時は、その値から253個を使います。
 - `check`: 全行 `1`
 - 改行文字の行、つまり `character` が実改行、または `display` が `<LF>` の行は出力CSVに含めず、indexも割り当てません。
 
@@ -243,13 +267,22 @@ python3 build_tileset_from_png_font.py \
 
 美咲フォントPNGを使う場合:
 
+デフォルトの開始indexは従来どおり `0` です。次の例はindex `128` から
+配置する場合です。
+
 ```bash
 python3 build_tileset_from_png_font.py \
   --misaki \
   --font-png path/to/misaki.png \
   --mapping path/to/char_and_text.csv \
-  --output path/to/tileset.png
+  --output path/to/tileset.png \
+  --start-index 128
 ```
+
+`add_bank_index_columns.py` で `--start-index` を指定した場合は、同じ値を
+`build_tileset_from_png_font.py` にも指定してください。`128`の場合、文字は
+index `128..380`、固定記号 `▼` はindex `381`、index `382`は空白になり、
+制御タイルは従来どおりindex `383`に配置されます。
 
 配置ルール:
 
@@ -260,12 +293,70 @@ python3 build_tileset_from_png_font.py \
 - k6x8のglyphは各8x8タイル内の `(1, 1)` へ貼り付けます。
 - 美咲フォントのglyphは各8x8タイル内の `(0, 0)` へ貼り付けます。
 - 背景色は白 `#ffffff` です。
-- `index 253` は区点 `02-07` の `▼` を置く固定記号タイルとして扱います。
-- `index 254` と `255` は常に背景色だけの空白タイルとして扱います。
+- `start_index + 253` は、区点 `02-07` の `▼` を置く固定記号タイルとして扱います。
+- `start_index + 254` と `start_index + 255` は予約タイルです。ただしindex `383` は制御タイルが優先されます。
 - 最後のタイルは制御用として、上半分を `#bfbfbf`、下半分を `#808080` で塗ります。
 - 複数bankがCSVに含まれる場合は、bankごとに `tileset_bank1.png` のような別ファイルを出力します。
 - `--bank 1` のように指定すると、そのbankだけを `--output` のパスへ出力します。
 - 貼り付け位置は `--offset-x`, `--offset-y` で変更できます。
+
+## 美咲フォントの文字を既存タイルセットへ追加する
+
+`add_glyphs_to_tileset.py` は、美咲フォントの区点順PNGから指定文字を
+切り出し、既存タイルセットの指定したタイル座標へ追加します。
+
+```bash
+python3 add_glyphs_to_tileset.py \
+  --font-png path/to/misaki_gothic.png \
+  --tileset path/to/tileset.png \
+  --placement 'Ⅰ=14,15' \
+  --placement 'Ⅱ=15,15' \
+  --output path/to/tileset_with_glyphs.png
+```
+
+配置ルール:
+
+- `--placement` は `文字=X,Y` の形式で、複数回指定できます。
+- X、Yは左上を `(0, 0)` とした16列x24行のタイル座標です。
+- Xは `0..15`、Yは `0..23` の範囲で指定します。
+- 標準JIS X 0208文字と、美咲独自拡張の `Ⅰ`、`Ⅱ`、`Ⅲ` に対応します。
+- 指定位置の既存タイルは8x8 px全体が新しい字形で上書きされます。
+- 固定・予約・制御用のタイル位置も、明示的に指定した場合は上書きされます。
+- `--output` は必須です。元画像を保持するには別のパスを指定してください。
+
+## 符号化したテキストをPNGで確認する
+
+`render_encoded_text.py` は、`encode_text_to_words.py` が生成したASMと、
+`build_tileset_from_png_font.py` が生成したbank別タイルセットを使って、
+元のテキスト配置を確認するためのPNGを生成します。
+
+```bash
+python3 render_encoded_text.py \
+  --asm path/to/text_0.asm \
+  --tileset 1=path/to/tileset.png \
+  --output path/to/text_0_preview.png
+```
+
+複数bankを参照する場合は `--tileset` を繰り返します。
+
+```bash
+python3 render_encoded_text.py \
+  --asm path/to/text_0.asm \
+  --tileset 1=path/to/tileset_bank1.png \
+  --tileset 2=path/to/tileset_bank2.png \
+  --output path/to/text_0_preview.png
+```
+
+描画ルール:
+
+- 出力は32列x32行、1タイル8x8 pxの256x256 px PNGです。
+- 背景色は白 `#ffffff` です。
+- デフォルトの描画開始位置は、左上を `(0, 0)` としたタイル座標 `(1, 1)` です。
+- `--start-x` と `--start-y` で開始位置を変更できます。
+- 通常値は上位4bitをbank、下位12bitをタイルセット内のindexとして扱います。
+- `$FFFE` で開始X座標へ戻って1行下へ移動し、`$FFFF` で描画を終了します。
+- 自動折り返しは行いません。文字が32x32タイルの範囲を超える場合はエラーになります。
+- タイルセットPNGは16列x24行の128x192 pxである必要があります。
 
 ## Test
 

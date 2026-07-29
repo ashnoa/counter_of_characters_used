@@ -15,6 +15,7 @@ FIRST_BANK = 1
 MAX_TEXT_INDEX = 252
 AVAILABLE_INDEXES = list(range(MAX_TEXT_INDEX + 1))
 ROWS_PER_BANK = len(AVAILABLE_INDEXES)
+MAX_START_INDEX = 128
 ADDED_COLUMNS = ["mode", "bank", "index", "check"]
 
 
@@ -22,25 +23,40 @@ def is_newline_row(row: dict[str, str]) -> bool:
     return row.get("character") == "\n" or row.get("display") == "<LF>"
 
 
-def bank_index_for_row(row_number: int) -> tuple[int, int]:
+def validate_start_index(start_index: int) -> None:
+    if not 0 <= start_index <= MAX_START_INDEX:
+        raise ValueError(
+            f"start_index must be between 0 and {MAX_START_INDEX}: {start_index}"
+        )
+
+
+def bank_index_for_row(
+    row_number: int,
+    *,
+    start_index: int = 0,
+) -> tuple[int, int]:
     if row_number < 0:
         raise ValueError("row_number must be greater than or equal to zero")
+    validate_start_index(start_index)
     bank = FIRST_BANK + (row_number // ROWS_PER_BANK)
-    index = AVAILABLE_INDEXES[row_number % ROWS_PER_BANK]
+    index = start_index + AVAILABLE_INDEXES[row_number % ROWS_PER_BANK]
     return bank, index
 
 
 def add_bank_index_columns(
     rows: list[dict[str, str]],
     fieldnames: list[str],
+    *,
+    start_index: int = 0,
 ) -> tuple[list[str], list[dict[str, str]]]:
+    validate_start_index(start_index)
     output_fieldnames = [name for name in fieldnames if name not in ADDED_COLUMNS]
     output_fieldnames.extend(ADDED_COLUMNS)
 
     output_rows: list[dict[str, str]] = []
     assignable_rows = [row for row in rows if not is_newline_row(row)]
     for row_number, row in enumerate(assignable_rows):
-        bank, index = bank_index_for_row(row_number)
+        bank, index = bank_index_for_row(row_number, start_index=start_index)
         output_row = {name: row.get(name, "") for name in output_fieldnames}
         output_row["mode"] = DEFAULT_MODE
         output_row["bank"] = str(bank)
@@ -89,6 +105,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         type=Path,
         help="Output CSV path. Defaults to standard output.",
     )
+    parser.add_argument(
+        "--start-index",
+        type=int,
+        default=0,
+        help=(
+            "First text tile index in every bank. Must be between 0 and 128. "
+            "Defaults to 0."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -97,7 +122,11 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         fieldnames, rows = read_csv(args.input)
-        output_fieldnames, output_rows = add_bank_index_columns(rows, fieldnames)
+        output_fieldnames, output_rows = add_bank_index_columns(
+            rows,
+            fieldnames,
+            start_index=args.start_index,
+        )
         write_csv(args.output, output_fieldnames, output_rows)
     except (OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)

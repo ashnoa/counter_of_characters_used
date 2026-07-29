@@ -5,6 +5,7 @@ import unittest
 from kuten_inspector import (
     format_kuten,
     jis_x_0208_kuten,
+    kuten_for_character,
     load_counter_from_char_counter_json,
     rows_from_counter,
     warn_missing_kuten,
@@ -19,6 +20,33 @@ class KutenInspectorTest(unittest.TestCase):
     def test_returns_none_for_non_jis_x_0208_character(self):
         self.assertIsNone(jis_x_0208_kuten("😀"))
         self.assertEqual(format_kuten(None), "")
+
+    def test_returns_misaki_row_13_extensions_only_when_enabled(self):
+        expected = {"Ⅰ": (13, 21), "Ⅱ": (13, 22), "Ⅲ": (13, 23)}
+
+        for character, kuten in expected.items():
+            with self.subTest(character=character):
+                self.assertIsNone(jis_x_0208_kuten(character))
+                self.assertIsNone(kuten_for_character(character))
+                self.assertEqual(kuten_for_character(character, misaki=True), kuten)
+
+    def test_builds_misaki_extension_rows_without_marking_them_as_standard_jis(self):
+        rows = rows_from_counter(
+            {"Ⅰ": 1, "Ⅱ": 1, "Ⅲ": 1},
+            {ord("Ⅰ"), ord("Ⅱ"), ord("Ⅲ")},
+            misaki=True,
+        )
+
+        self.assertEqual(
+            [row["jis_x_0208_kuten"] for row in rows],
+            ["13-21", "13-22", "13-23"],
+        )
+        self.assertTrue(all(row["in_jis_x_0208"] is False for row in rows))
+        self.assertTrue(all(row["in_font"] is True for row in rows))
+
+        stream = io.StringIO()
+        warn_missing_kuten(rows, stream=stream)
+        self.assertEqual(stream.getvalue(), "")
 
     def test_builds_rows_with_font_coverage(self):
         rows = rows_from_counter({"あ": 2, "😀": 1}, {ord("あ")})
